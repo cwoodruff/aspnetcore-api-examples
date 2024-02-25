@@ -1,0 +1,336 @@
+﻿using System.Net;
+using System.Text.Json;
+using Chinook.Domain.ApiModels;
+using Chinook.Domain.Extensions;
+using Chinook.Domain.Supervisor;
+using FluentValidation;
+using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.JsonPatch;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace Chinook.WebAPI.Controllers;
+
+[Route("api/[controller]")]
+[ApiController]
+[EnableCors("CorsPolicy")]
+[ApiVersion("1.0")]
+public class TrackController(IChinookSupervisor chinookSupervisor, ILogger<TrackController> logger)
+    : ControllerBase
+{
+    [HttpGet]
+    [Produces("application/json")]
+    public async Task<ActionResult<PagedList<TrackApiModel>>> Get([FromQuery] int pageNumber, [FromQuery] int pageSize)
+    {
+        try
+        {
+            var tracks = await chinookSupervisor.GetAllTrack(pageNumber, pageSize);
+
+            if (tracks.Any())
+            {
+                var metadata = new
+                {
+                    tracks.TotalCount,
+                    tracks.PageSize,
+                    tracks.CurrentPage,
+                    tracks.TotalPages,
+                    tracks.HasNext,
+                    tracks.HasPrevious
+                };
+                Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(metadata));
+                return Ok(tracks);
+            }
+
+            return StatusCode((int)HttpStatusCode.NotFound, "No Tracks Could Be Found");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Something went wrong inside the TrackController Get action: {Ex}", ex);
+            return StatusCode((int)HttpStatusCode.InternalServerError,
+                "Error occurred while executing Get All Tracks");
+        }
+    }
+
+    [HttpGet("{id}", Name = "GetTrackById")]
+    [Produces("application/json")]
+    public async Task<ActionResult<TrackApiModel>> Get(int id)
+    {
+        try
+        {
+            var track = await chinookSupervisor.GetTrackById(id);
+
+            if (track != null)
+            {
+                return Ok(track);
+            }
+
+            return StatusCode((int)HttpStatusCode.NotFound, "Track Not Found");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Something went wrong inside the TrackController GetById action: {Ex}", ex);
+            return StatusCode((int)HttpStatusCode.InternalServerError,
+                "Error occurred while executing Get Track By Id");
+        }
+    }
+
+    [HttpPost]
+    [Produces("application/json")]
+    [Consumes("application/json")]
+    public async Task<ActionResult<TrackApiModel>> Post([FromBody] TrackApiModel? input)
+    {
+        try
+        {
+            return input == null
+                ? StatusCode((int)HttpStatusCode.BadRequest, "Given Track is null")
+                : Ok(await chinookSupervisor.AddTrack(input));
+        }
+        catch (ValidationException ex)
+        {
+            logger.LogError("Something went wrong inside the TrackController Add Track action: {Ex}", ex);
+            return StatusCode((int)HttpStatusCode.InternalServerError, "Error occurred while executing Add Tracks");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Something went wrong inside the TrackController Add Track action: {Ex}", ex);
+            return StatusCode((int)HttpStatusCode.InternalServerError, "Error occurred while executing Add Tracks");
+        }
+    }
+
+    [HttpPut("{id}")]
+    [Produces("application/json")]
+    [Consumes("application/json")]
+    public async Task<ActionResult<TrackApiModel>> Put(int id, [FromBody] TrackApiModel? input)
+    {
+        try
+        {
+            return input == null
+                ? StatusCode((int)HttpStatusCode.BadRequest, "Given Track is null")
+                : Ok(await chinookSupervisor.UpdateTrack(input));
+        }
+        catch (ValidationException ex)
+        {
+            logger.LogError("Something went wrong inside the TrackController Update Track action: {Ex}", ex);
+            return StatusCode((int)HttpStatusCode.InternalServerError,
+                "Error occurred while executing Update Tracks");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Something went wrong inside the TrackController Update Track action: {Ex}", ex);
+            return StatusCode((int)HttpStatusCode.InternalServerError,
+                "Error occurred while executing Update Tracks");
+        }
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> Delete(int id)
+    {
+        try
+        {
+            return Ok(await chinookSupervisor.DeleteTrack(id));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Something went wrong inside the TrackController Delete action: {Ex}", ex);
+            return StatusCode((int)HttpStatusCode.InternalServerError,
+                "Error occurred while executing Delete Track");
+        }
+    }
+
+    [HttpGet("artist/{id}")]
+    [Produces("application/json")]
+    public async Task<ActionResult<PagedList<TrackApiModel>>> GetByArtistId(int id, [FromQuery] int pageNumber,
+        [FromQuery] int pageSize)
+    {
+        try
+        {
+            var tracks = await chinookSupervisor.GetTrackByArtistId(id, pageNumber, pageSize);
+
+            if (tracks.Any())
+            {
+                var metadata = new
+                {
+                    tracks.TotalCount,
+                    tracks.PageSize,
+                    tracks.CurrentPage,
+                    tracks.TotalPages,
+                    tracks.HasNext,
+                    tracks.HasPrevious
+                };
+                Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(metadata));
+                return Ok(tracks);
+            }
+
+            return StatusCode((int)HttpStatusCode.NotFound, "No Tracks Could Be Found for the Artist");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Something went wrong inside the TrackController Get By Artist action: {Ex}", ex);
+            return StatusCode((int)HttpStatusCode.InternalServerError,
+                "Error occurred while executing Get All Tracks for Artist");
+        }
+    }
+
+    [HttpGet("invoice/{id}")]
+    [Produces("application/json")]
+    public async Task<ActionResult<PagedList<TrackApiModel>>> GetByInvoiceId(int id, [FromQuery] int pageNumber,
+        [FromQuery] int pageSize)
+    {
+        try
+        {
+            var tracks = await chinookSupervisor.GetTrackByInvoiceId(id, pageNumber, pageSize);
+
+            if (tracks.Any())
+            {
+                var metadata = new
+                {
+                    tracks.TotalCount,
+                    tracks.PageSize,
+                    tracks.CurrentPage,
+                    tracks.TotalPages,
+                    tracks.HasNext,
+                    tracks.HasPrevious
+                };
+                Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(metadata));
+                return Ok(tracks);
+            }
+
+            return StatusCode((int)HttpStatusCode.NotFound, "No Tracks Could Be Found for the Invoice");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Something went wrong inside the TrackController Get By Invoice action: {Ex}", ex);
+            return StatusCode((int)HttpStatusCode.InternalServerError,
+                "Error occurred while executing Get All Tracks for Invoice");
+        }
+    }
+
+    [HttpGet("album/{id}")]
+    [Produces("application/json")]
+    public async Task<ActionResult<PagedList<TrackApiModel>>> GetByAlbumId(int id, [FromQuery] int pageNumber,
+        [FromQuery] int pageSize)
+    {
+        try
+        {
+            var tracks = await chinookSupervisor.GetTrackByAlbumId(id, pageNumber, pageSize);
+
+            if (tracks != null && !tracks.Any())
+                return StatusCode((int)HttpStatusCode.NotFound, "No Tracks Could Be Found for the Album");
+
+            var metadata = new
+            {
+                tracks.TotalCount,
+                tracks.PageSize,
+                tracks.CurrentPage,
+                tracks.TotalPages,
+                tracks.HasNext,
+                tracks.HasPrevious
+            };
+            Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(metadata));
+            return Ok(tracks);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Something went wrong inside the TrackController Get By Album action: {Ex}", ex);
+            return StatusCode((int)HttpStatusCode.InternalServerError,
+                "Error occurred while executing Get All Tracks for Album");
+        }
+    }
+
+    [HttpGet("mediatype/{id}")]
+    [Produces("application/json")]
+    public async Task<ActionResult<PagedList<TrackApiModel>>> GetByMediaTypeId(int id, [FromQuery] int pageNumber,
+        [FromQuery] int pageSize)
+    {
+        try
+        {
+            var tracks = await chinookSupervisor.GetTrackByMediaTypeId(id, pageNumber, pageSize);
+
+            if (tracks.Any())
+            {
+                var metadata = new
+                {
+                    tracks.TotalCount,
+                    tracks.PageSize,
+                    tracks.CurrentPage,
+                    tracks.TotalPages,
+                    tracks.HasNext,
+                    tracks.HasPrevious
+                };
+                Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(metadata));
+                return Ok(tracks);
+            }
+
+            return StatusCode((int)HttpStatusCode.NotFound, "No Tracks Could Be Found for the Media Type");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Something went wrong inside the TrackController Get By Media Type action: {Ex}", ex);
+            return StatusCode((int)HttpStatusCode.InternalServerError,
+                "Error occurred while executing Get All Tracks for Media Type");
+        }
+    }
+
+    [HttpGet("genre/{id}")]
+    [Produces("application/json")]
+    public async Task<ActionResult<PagedList<TrackApiModel>>> GetByGenreId(int id, [FromQuery] int pageNumber,
+        [FromQuery] int pageSize)
+    {
+        try
+        {
+            var tracks = await chinookSupervisor.GetTrackByGenreId(id, pageNumber, pageSize);
+
+            if (tracks.Any())
+            {
+                var metadata = new
+                {
+                    tracks.TotalCount,
+                    tracks.PageSize,
+                    tracks.CurrentPage,
+                    tracks.TotalPages,
+                    tracks.HasNext,
+                    tracks.HasPrevious
+                };
+                Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(metadata));
+                return Ok(tracks);
+            }
+
+            return StatusCode((int)HttpStatusCode.NotFound, "No Tracks Could Be Found for the Genre");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Something went wrong inside the TrackController Get By Genre action: {Ex}", ex);
+            return StatusCode((int)HttpStatusCode.InternalServerError,
+                "Error occurred while executing Get All Tracks for Genre");
+        }
+    }
+
+    [HttpPatch("{id}")]
+    public async Task<ActionResult<TrackApiModel>> Patch(int id, [FromBody] JsonPatchDocument<TrackApiModel> input)
+    {
+        var track = await chinookSupervisor.GetTrackById(id);
+
+        if (track == null)
+        {
+            return NotFound();
+        }
+
+        input.ApplyTo(track, ModelState); // Must have Microsoft.AspNetCore.Mvc.NewtonsoftJson installed  
+
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            await chinookSupervisor.UpdateTrack(track); //Update in the database
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return NotFound();
+        }
+
+        return Ok(track);
+    }
+}
